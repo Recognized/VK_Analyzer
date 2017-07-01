@@ -1,6 +1,7 @@
 import urllib.request, urllib.parse, urllib.error
 from urllib.parse import urlparse
 from html.parser import HTMLParser
+import http.cookiejar
 
 class FormParser(HTMLParser):
     def __init__(self):
@@ -50,7 +51,7 @@ def auth(email, password, client_id, scope):
             "redirect_uri=http://oauth.vk.com/blank.html&response_type=token&" + \
             "client_id=%s&scope=%s&display=wap" % (client_id, ",".join(scope))
             )
-        doc = response.read()
+        doc = str(response.read())
         parser = FormParser()
         parser.feed(doc)
         parser.close()
@@ -60,7 +61,7 @@ def auth(email, password, client_id, scope):
         parser.params["email"] = email
         parser.params["pass"] = password
         if parser.method == "POST":
-            response = opener.open(parser.url, urllib.parse.urlencode(parser.params))
+            response = opener.open(parser.url, urllib.parse.urlencode(parser.params).encode("utf-8"))
         else:
             raise NotImplementedError("Method '%s'" % parser.method)
         return response.read(), response.geturl()
@@ -73,7 +74,7 @@ def auth(email, password, client_id, scope):
         if not parser.form_parsed or parser.url is None:
               raise RuntimeError("Something wrong")
         if parser.method == "POST":
-            response = opener.open(parser.url, urllib.parse.urlencode(parser.params))
+            response = opener.open(parser.url, urllib.parse.urlencode(parser.params).encode("utf-8"))
         else:
             raise NotImplementedError("Method '%s'" % parser.method)
         return response.geturl()
@@ -82,9 +83,10 @@ def auth(email, password, client_id, scope):
     if not isinstance(scope, list):
         scope = [scope]
     opener = urllib.request.build_opener(
-        urllib.request.HTTPCookieProcessor(cookielib.CookieJar()),
+        urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
         urllib.request.HTTPRedirectHandler())
     doc, url = auth_user(email, password, client_id, scope, opener)
+    doc = str(doc)
     if urlparse(url).path != "/blank.html":
         # Need to give access to requested scope
         url = give_access(doc, opener)

@@ -39,16 +39,22 @@ def get_all_dialogs(token):
     return dialogs_list
 
 
-def get_id_of_dialog(dialog):
-    if dialog["title"] != " ... ":
-        return 2000000000 + dialog["chat_id"]
-    else:
-        return dialog["user_id"]
+class Dialog:
+    def __init__(self, info, token):
+        # case multichat
+        if "chat_id" in info:
+            self.name = info["title"]
+            self.id = info["chat_id"] + 2000000000
+        # case user
+        elif info["user_id"] > 0:
+            self.id = info["user_id"]
+            ans = call_api("users.get", user_id=self.id, access_token=token)
+            self.name = ans[0]["first_name"] + " " + ans[0]["last_name"]
+        # case community chat
+        else:
+            self.id = -info["user_id"]
+            ans = call_api("groups.getById", group_id=self.id, access_token=token)
+            self.name = ans[0]["name"]
 
 
-def get_name_of_dialog(user_id, title, token):
-    if title != " ... ":
-        return title
-    else:
-        ans = call_api("users.get", user_id=user_id, access_token=token)
-        return ans[0]["first_name"] + " " + ans[0]["last_name"]
+

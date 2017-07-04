@@ -4,17 +4,20 @@ import sqlite3
 import time
 import progressbar
 import vk.api
+import codecs
 
+output = codecs.open("output.txt", "w", encoding="utf-8")
 del_trash = re.compile(r"[\'\"]+|\\$]", re.U)
 
 
 def dump_message_pack(dialog_id, messages, cursor, regexp=del_trash):
-    for msg in messages['items']:
+    for msg in messages["items"]:
         if msg["body"] == "":
             continue
         cursor.execute(r"""INSERT OR REPLACE INTO t%s VALUES (%s, "%s", %s)"""
                        % (dialog_id, msg["id"],
                           regexp.sub("", msg["body"]), msg["date"]))
+        output.write(regexp.sub("", msg["body"])+'\n')
     time.sleep(1)
 
 
@@ -35,41 +38,52 @@ def main():
     print("Authorization succeeded\n")
     with sqlite3.connect("dialogs.sqlite") as db:
         cursor = db.cursor()
-        cursor.execute("DROP TABLE dialogs")
         dialogs = vk.api.get_all_dialogs(token)
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS dialogs (dialog_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, name TEXT)")
+        cursor.execute(
+            "CREATE TABLE IF NOT EXISTS dialog_counter (dialog_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, counter INT)")
         for info in dialogs:
-            dialog = info["message"]
-            dialog_id = vk.api.get_id_of_dialog(dialog)
-            cursor.execute("SELECT * FROM dialogs WHERE dialog_id=%s" % dialog_id)
-            if cursor.fetchone() is not None:
-                continue
+            dialog = vk.api.Dialog(info["message"], token)
+
+            cursor.execute("SELECT counter FROM dialog_counter WHERE dialog_id=%s" % dialog.id)
+            offset = cursor.fetchone()
+            if offset is None:
+                offset = 0
+            else:
+                offset = offset[0]
             cursor.execute(
                 "CREATE TABLE IF NOT EXISTS t%s (message_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, body TEXT, date INT)"
-                % dialog_id)
-            name = vk.api.get_name_of_dialog(dialog_id, dialog["title"], token)
+                % dialog.id)
             cursor.execute("INSERT OR REPLACE INTO dialogs VALUES (?, ?)",
-                           (dialog_id, name))
-            first_response = vk.api.collect_messages(dialog_id, 0, token)
-            messages_in_dialog = first_response['count']
+                           (dialog.id, dialog.name))
+            offset = 0
+            first_response = vk.api.collect_messages(dialog.id, offset, token)
+            messages_in_dialog = first_response["count"]
+            # if offset == messages_in_dialog:
+            #     print(" " + dialog.name + "\'s dialog is already dumped\n")
+            #     time.sleep(1)
+            #     continue
             bar = progressbar.ProgressBar(max_value=messages_in_dialog,
                                           widgets=[
                                               progressbar.Percentage(), " ",
                                               progressbar.SimpleProgress(),
                                               ' [', progressbar.Timer(), '] ',
-                                              progressbar.Bar(), name,
+                                              progressbar.Bar(), dialog.name,
                                           ])
-            dump_message_pack(dialog_id, first_response, cursor)
-            offset = 4000
-            bar.update(min(offset, messages_in_dialog))
+            dump_message_pack(dialog.id, first_response, cursor)
             fixed_offset = 4000
+            offset = offset + fixed_offset
+            bar.update(0)
+            bar.update(min(offset, messages_in_dialog))
             while offset < messages_in_dialog:
-                response = vk.api.collect_messages(dialog_id, offset, token)
-                dump_message_pack(dialog_id, response, cursor)
+                response = vk.api.collect_messages(dialog.id, offset, token)
+                dump_message_pack(dialog.id, response, cursor)
                 offset = offset + fixed_offset
                 bar.update(min(offset, messages_in_dialog))
-            print(" " + name + "\'s dialog dumped\n")
+            cursor.execute("INSERT OR REPLACE INTO dialog_counter VALUES (?, ?)", (dialog.id, messages_in_dialog))
+            print(" " + dialog.name + "\'s dialog dumped\n")
+            output.close()
             db.commit()
 
 

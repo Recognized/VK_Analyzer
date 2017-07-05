@@ -6,18 +6,19 @@ import progressbar
 import vk.api
 import codecs
 
-output = codecs.open("output.txt", "w", encoding="utf-8")
 del_trash = re.compile(r"[\'\"]+|\\$]", re.U)
 
 
-def dump_message_pack(dialog_id, messages, cursor, regexp=del_trash):
-    for msg in messages["items"]:
-        if msg["body"] == "":
-            continue
-        cursor.execute(r"""INSERT OR REPLACE INTO t%s VALUES (%s, "%s", %s)"""
-                       % (dialog_id, msg["id"],
-                          regexp.sub("", msg["body"]), msg["date"]))
-        output.write(regexp.sub("", msg["body"])+'\n')
+def dump_message_pack(dialog_id, ans, cursor, regexp=del_trash):
+    dump = [(msg["id"], regexp.sub("", msg["body"]), msg["date"])
+            for messages in ans for msg in reversed(messages["items"])
+            if msg["body"] != ""]
+    # for messages in ans:
+    #     for msg in reversed(messages["items"]):
+    #         if msg["body"] == "":
+    #             continue
+    #         dump.append((msg["id"], regexp.sub("", msg["body"]), msg["date"]))
+    cursor.executemany(r"""INSERT OR REPLACE INTO t%s VALUES (?, ?, ?)""" % dialog_id, dump)
     time.sleep(1)
 
 
@@ -42,48 +43,57 @@ def main():
         cursor.execute(
             "CREATE TABLE IF NOT EXISTS dialogs (dialog_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, name TEXT)")
         cursor.execute(
-            "CREATE TABLE IF NOT EXISTS dialog_counter (dialog_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, counter INT)")
+            "CREATE TABLE IF NOT EXISTS last_message_id (dialog_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, message_id INT)")
         for info in dialogs:
             dialog = vk.api.Dialog(info["message"], token)
 
-            cursor.execute("SELECT counter FROM dialog_counter WHERE dialog_id=%s" % dialog.id)
-            offset = cursor.fetchone()
-            if offset is None:
-                offset = 0
+            cursor.execute("SELECT message_id FROM last_message_id WHERE dialog_id=%s" % dialog.id)
+            start_message_id = cursor.fetchone()
+            if start_message_id is None:
+                start_message_id = vk.api.get_first_message_id(dialog, token)
             else:
-                offset = offset[0]
+                start_message_id = start_message_id[0]
             cursor.execute(
                 "CREATE TABLE IF NOT EXISTS t%s (message_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, body TEXT, date INT)"
                 % dialog.id)
             cursor.execute("INSERT OR REPLACE INTO dialogs VALUES (?, ?)",
                            (dialog.id, dialog.name))
-            offset = 0
-            first_response = vk.api.collect_messages(dialog.id, offset, token)
-            messages_in_dialog = first_response["count"]
-            # if offset == messages_in_dialog:
-            #     print(" " + dialog.name + "\'s dialog is already dumped\n")
-            #     time.sleep(1)
-            #     continue
-            bar = progressbar.ProgressBar(max_value=messages_in_dialog,
+            response = vk.api.collect_messages(dialog, start_message_id, token)
+            if response["result"][0]["items"][0]["id"] == start_message_id:
+                print(" " + dialog.name + "\'s dialog is already dumped\n")
+                time.sleep(1)
+                continue
+
+            if "skipped" in response["result"][0]:
+                barIndex = response["result"][0]["skipped"]
+            else:
+                j = 0
+                for i in response["result"][0]["items"]:
+                    if i["id"] > start_message_id:
+                        j = j + 1
+                barIndex = j
+
+            start_message_id = response["new_start"]
+
+            bar = progressbar.ProgressBar(max_value=barIndex,
                                           widgets=[
                                               progressbar.Percentage(), " ",
                                               progressbar.SimpleProgress(),
                                               ' [', progressbar.Timer(), '] ',
                                               progressbar.Bar(), dialog.name,
                                           ])
-            dump_message_pack(dialog.id, first_response, cursor)
-            fixed_offset = 4000
-            offset = offset + fixed_offset
+            dump_message_pack(dialog.id, response["result"], cursor)
+
             bar.update(0)
-            bar.update(min(offset, messages_in_dialog))
-            while offset < messages_in_dialog:
-                response = vk.api.collect_messages(dialog.id, offset, token)
-                dump_message_pack(dialog.id, response, cursor)
-                offset = offset + fixed_offset
-                bar.update(min(offset, messages_in_dialog))
-            cursor.execute("INSERT OR REPLACE INTO dialog_counter VALUES (?, ?)", (dialog.id, messages_in_dialog))
-            print(" " + dialog.name + "\'s dialog dumped\n")
-            output.close()
+
+            while "skipped" in response["result"][0]:
+                bar.update(barIndex - response["result"][0]["skipped"])
+                response = vk.api.collect_messages(dialog, start_message_id, token)
+                start_message_id = response["new_start"]
+
+                dump_message_pack(dialog.id, response["result"], cursor)
+            bar.finish()
+            cursor.execute("INSERT OR REPLACE INTO last_message_id VALUES (?, ?)", (dialog.id, start_message_id))
             db.commit()
 
 

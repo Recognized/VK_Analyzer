@@ -7,6 +7,7 @@ def merge_list(a, b):
         a.append(i)
 
 
+# this function tooks major time
 def read_response(url):
     info = urllib.request.urlopen(url).read()
     try:
@@ -22,8 +23,12 @@ def call_api(method, **kwargs):
     return read_response(url)
 
 
-def collect_messages(peer_id, offset, token):
-    return call_api("execute.getMessages", peer_id=peer_id, offset=offset, access_token=token)[0]
+def collect_messages(dialog, start, token):
+    return call_api("execute.getMessages", peer_id=dialog.msgid, start_message_id=start, access_token=token)
+
+
+def get_first_message_id(dialog, token):
+    return call_api("messages.getHistory", peer_id=dialog.msgid, access_token=token, rev=1)["items"][0]["id"]
 
 
 def get_all_dialogs(token):
@@ -42,19 +47,27 @@ def get_all_dialogs(token):
 class Dialog:
     def __init__(self, info, token):
         # case multichat
+        self.token = token
         if "chat_id" in info:
             self.name = info["title"]
             self.id = info["chat_id"] + 2000000000
+            self.type = "chat"
+            self.msgid = self.id
         # case user
         elif info["user_id"] > 0:
             self.id = info["user_id"]
             ans = call_api("users.get", user_id=self.id, access_token=token)
             self.name = ans[0]["first_name"] + " " + ans[0]["last_name"]
+            self.type = "user"
+            self.msgid = self.id
         # case community chat
         else:
             self.id = -info["user_id"]
+            self.msgid = -self.id
             ans = call_api("groups.getById", group_id=self.id, access_token=token)
             self.name = ans[0]["name"]
+            self.type = "community"
+
 
 
 

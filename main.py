@@ -2,9 +2,8 @@ import authorize
 import re
 import sqlite3
 import time
-import progressbar
+import forks.progressbar_fork as progressbar
 import vk.api
-import codecs
 
 del_trash = re.compile(r"[\'\"]+|\\$]", re.U)
 

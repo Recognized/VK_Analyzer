@@ -133,11 +133,54 @@ def build_word_frequencies_table():
 
         bar.finish()
 
+def build_dialog_activity():
+    with sqlite3.connect("dialogs.sqlite") as db, sqlite3.connect("activity.sqlite") as table:
+        dialogs = db.cursor()
+        activity = table.cursor()
+
+        day_of_time_all = dict()
+        dialogs.execute("SELECT dialog_id FROM dialogs")
+        copy = dialogs.fetchall()
+
+        bar = progressbar.ProgressBar(max_value=len(copy) - 1,
+                                      widgets=[
+                                          progressbar.Percentage(), " ",
+                                          progressbar.SimpleProgress(),
+                                          ' [', progressbar.Timer(), '] ',
+                                          progressbar.Bar(), "Activity is counting",
+                                      ])
+        regexp = re.compile("\\W+")
+
+        for row, i in zip(copy, range(len(copy))):
+            bar.update(i)
+            dialog_id = row[0]
+            day_of_time_cur = dict()
+            dialogs.execute("SELECT date FROM t%s" % dialog_id)
+            for message_row in dialogs.fetchall():
+                t = message_row[0]
+                when = int(regexp.split(time.ctime(t))[3][:2])
+                day_of_time_all.setdefault(when, 0)
+                day_of_time_cur.setdefault(when, 0)
+                day_of_time_all[when] += 1
+                day_of_time_cur[when] += 1
+
+            activity.execute("CREATE TABLE IF NOT EXISTS t%s (time INT, counter INT)" % dialog_id)
+            activity.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?)" % dialog_id,
+                              [(i, j) for i, j in day_of_time_cur.items()])
+        activity.execute("CREATE TABLE IF NOT EXISTS global (time INT, counter INT)")
+        activity.executemany("INSERT OR REPLACE INTO global VALUES(?, ?)",
+                          [(i, j) for i, j in day_of_time_all.items()])
+        table.commit()
+
+        bar.finish()
+
+
 
 def main():
     token, user_id = authorization()
     # create_or_complete_database(token)
-    build_word_frequencies_table()
+    # build_word_frequencies_table()
+    build_dialog_activity()
 
 if __name__ == "__main__":
     main()

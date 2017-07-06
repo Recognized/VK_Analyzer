@@ -1,3 +1,4 @@
 TODO: add functionality to show a plot which describes activity in certain dialog in some period
 TODO: exclude frequently using words from statistic
 TODO: use frequency words dictionary
+TODO: 

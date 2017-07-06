@@ -12,11 +12,11 @@ def dump_message_pack(dialog_id, ans, cursor, regexp=del_trash):
     dump = [(msg["id"], regexp.sub("", msg["body"]), msg["date"])
             for messages in ans for msg in reversed(messages["items"])
             if msg["body"] != ""]
-    cursor.executemany(r"""INSERT OR REPLACE INTO t%s VALUES (?, ?, ?)""" % dialog_id, dump)
+    cursor.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?, ?)" % dialog_id, dump)
     time.sleep(1)
 
 
-def main():
+def authorization():
     client_id = "6096377"
     scope = "messages,offline"
 
@@ -29,8 +29,11 @@ def main():
             password = str(input("Password: "))
             token, user_id = authorize.auth(email, password, client_id, scope)
             file.write(token + "\n" + user_id)
-
     print("Authorization succeeded\n")
+    return token, user_id
+
+
+def create_or_complete_database(token):
     with sqlite3.connect("dialogs.sqlite") as db:
         cursor = db.cursor()
         dialogs = vk.api.get_all_dialogs(token)
@@ -90,6 +93,51 @@ def main():
             cursor.execute("INSERT OR REPLACE INTO last_message_id VALUES (?, ?)", (dialog.id, start_message_id))
             db.commit()
 
+
+def build_word_frequencies_table():
+    all_words_freq = dict()
+    with sqlite3.connect("frequencies.sqlite") as table, sqlite3.connect("dialogs.sqlite") as db:
+        freqs = table.cursor()
+        dialogs = db.cursor()
+        dialogs.execute("SELECT dialog_id FROM dialogs")
+        copy = dialogs.fetchall()
+
+        bar = progressbar.ProgressBar(max_value=len(copy)-1,
+                                    widgets=[
+                                    progressbar.Percentage(), " ",
+                                    progressbar.SimpleProgress(),
+                                     ' [', progressbar.Timer(), '] ',
+                                    progressbar.Bar(), "Frequencies are counting",
+                                    ])
+
+        for row, i in zip(copy, range(len(copy))):
+            bar.update(i)
+            dialog_id = row[0]
+            dialog_freq = dict()
+            dialogs.execute("SELECT body FROM t%s" % dialog_id)
+            for message_row in dialogs.fetchall():
+                body = message_row[0]
+                for word in re.split('[., ]+', body):
+                    s = word.lower()
+                    all_words_freq.setdefault(s, 0)
+                    dialog_freq.setdefault(s, 0)
+                    all_words_freq[s] += 1
+                    dialog_freq[s] += 1
+            freqs.execute("CREATE TABLE IF NOT EXISTS t%s (word TEXT, counter INT)" % dialog_id)
+            freqs.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?)" % dialog_id,
+                              [(i, j) for i, j in dialog_freq.items()])
+        freqs.execute("CREATE TABLE IF NOT EXISTS global (word TEXT, counter INT)")
+        freqs.executemany("INSERT OR REPLACE INTO global VALUES(?, ?)",
+                          [(i, j) for i, j in all_words_freq.items()])
+        table.commit()
+
+        bar.finish()
+
+
+def main():
+    token, user_id = authorization()
+    # create_or_complete_database(token)
+    build_word_frequencies_table()
 
 if __name__ == "__main__":
     main()

@@ -23,7 +23,7 @@ def main():
     token, user_id = authorization()
     # create_or_complete_database(token)
     # build_word_frequencies_table()
-    build_dialog_activity()
+    build_stat_by_week()
 
 if __name__ == "__main__":
     main()

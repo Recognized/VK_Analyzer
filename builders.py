@@ -116,12 +116,13 @@ def build_word_frequencies_table():
         bar.finish()
 
 
-def build_dialog_activity():
-    with sqlite3.connect("dialogs.sqlite") as db, sqlite3.connect("activity.sqlite") as table:
+def build_stat_by_time(parseTime, tableName):
+    with sqlite3.connect("dialogs.sqlite") as db, sqlite3.connect("%s.sqlite" % tableName) as table:
         dialogs = db.cursor()
         activity = table.cursor()
 
-        day_of_time_all = dict()
+        stat_all = dict()
+        gtime_all = dict()
         dialogs.execute("SELECT dialog_id FROM dialogs")
         copy = dialogs.fetchall()
 
@@ -132,27 +133,39 @@ def build_dialog_activity():
                                           ' [', progressbar.Timer(), '] ',
                                           progressbar.Bar(), "Activity is counting",
                                       ])
-        regexp = re.compile("\\W+")
 
         for row, i in zip(copy, range(len(copy))):
             bar.update(i)
             dialog_id = row[0]
-            day_of_time_cur = dict()
+            stat_cur = dict()
+            gtime_cur = dict()
             dialogs.execute("SELECT date FROM t%s" % dialog_id)
             for message_row in dialogs.fetchall():
                 t = message_row[0]
-                when = int(regexp.split(time.ctime(t))[3][:2])
-                day_of_time_all.setdefault(when, 0)
-                day_of_time_cur.setdefault(when, 0)
-                day_of_time_all[when] += 1
-                day_of_time_cur[when] += 1
+                when = parseTime(t)
+                stat_all.setdefault(when, 0)
+                stat_cur.setdefault(when, 0)
+                gtime_all.setdefault(when, t)
+                gtime_cur.setdefault(when, t)
+                stat_all[when] += 1
+                stat_cur[when] += 1
 
-            activity.execute("CREATE TABLE IF NOT EXISTS t%s (time INT, counter INT)" % dialog_id)
-            activity.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?)" % dialog_id,
-                                 [(i, j) for i, j in day_of_time_cur.items()])
-        activity.execute("CREATE TABLE IF NOT EXISTS global (time INT, counter INT)")
-        activity.executemany("INSERT OR REPLACE INTO global VALUES(?, ?)",
-                             [(i, j) for i, j in day_of_time_all.items()])
+            activity.execute("CREATE TABLE IF NOT EXISTS t%s (time INT, counter INT, gtime INT)" % dialog_id)
+            activity.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?, ?)" % dialog_id,
+                                 [(i, j, gtime_cur[i]) for i, j in stat_cur.items()])
+        activity.execute("CREATE TABLE IF NOT EXISTS global (time INT, counter INT, gtime INT)")
+        activity.executemany("INSERT OR REPLACE INTO global VALUES(?, ?, ?)",
+                             [(i, j, gtime_all[i]) for i, j in stat_all.items()])
         table.commit()
 
         bar.finish()
+
+
+def build_stat_by_daytime():
+    regexp = re.compile("\\W+")
+    build_stat_by_time(lambda x : int(regexp.split(time.ctime(x))[3][:2]), "daytime")
+
+
+def build_stat_by_week():
+    build_stat_by_time(lambda x: x // (7 * 24 * 60 * 60), "week")
+

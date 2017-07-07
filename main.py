@@ -1,4 +1,5 @@
 import authorize
+from drawers import *
 from builders import *
 
 
@@ -23,7 +24,10 @@ def main():
     token, user_id = authorization()
     # create_or_complete_database(token)
     # build_word_frequencies_table()
-    build_stat_by_week()
+    # build_stat_by_week()
+    # build_stat_by_day()
+    day_accum_plot(2000000020)
+
 
 if __name__ == "__main__":
     main()

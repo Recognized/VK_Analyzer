@@ -169,3 +169,5 @@ def build_stat_by_daytime():
 def build_stat_by_week():
     build_stat_by_time(lambda x: x // (7 * 24 * 60 * 60), "week")
 
+def build_stat_by_day():
+    build_stat_by_time(lambda x: x // (24 * 60 * 60), "day")

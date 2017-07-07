@@ -1,4 +1,13 @@
-TODO: add functionality to show a plot which describes activity in certain dialog in some period
 TODO: exclude frequently using words from statistic
 TODO: use frequency words dictionary
-TODO: 
+TODO: NMF
+
+# TODO:
+        1. Разложить на слова предложения
+        2. Выкинуть частицы, местоимения, междометия, часто-употребляемые слова
+        3. Привести слова к нормальной форме
+        4. Представить диалог в виде вектора
+        5. Кластеризовать векторы
+        6. Найти характеристические слова в кластере
+        7. Выделить тему у кластера
+        8. Присвоить диалогу тему

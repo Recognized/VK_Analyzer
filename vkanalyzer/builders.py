@@ -12,20 +12,17 @@ other_symbols = re.compile(r"[^a-zA-Zа-яА-Я ]", re.U)
 processors = os.cpu_count()
 
 
-def normalize_message(bodies):
+def normalize_message(body):
+    text = ""
     morph = pymorphy2.MorphAnalyzer()
-    ans = []
-    for body in bodies:
-        text = ""
-        body = other_symbols.sub("", body)
-        for word in re.split("[\\W]+", body):
-            m = morph.parse(word)
-            if len(m) > 0:
-                wrd = m[0]
-                if wrd.tag.POS not in ('NUMR', 'NPRO', 'PREP', 'CONJ', 'PRCL', 'INTJ'):
+    body = other_symbols.sub("", body)
+    for word in re.split("[\\W]+", body):
+        m = morph.parse(word)
+        if len(m) > 0:
+            wrd = m[0]
+            if wrd.tag.POS not in ('NUMR', 'NPRO', 'PREP', 'CONJ', 'PRCL', 'INTJ'):
                     text += wrd.normal_form + " "
-        ans.append(text)
-    return ans
+    return text
 
 
 def split(dump):
@@ -55,10 +52,11 @@ def dump_message_pack(dialog_id, ans, cursor, regexp=del_trash):
             if msg["body"] != ""]
     cursor.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?, ?)" % dialog_id, dump)
     if len(dump) < 300:
-        normal_form_dump = normalize_message([tuple(body[1]) for body in dump])
+        normal_form_dump = [tuple(normalize_message(body[1])) for body in dump]
     else:
         with mp.Pool(processors) as p:
-            normal_form_dump = p.map(normalize_message, split(dump))
+            temp = p.map(normalize_message, [body[1] for body in dump])
+            normal_form_dump = [tuple(i) for i in temp]
     cursor.executemany("INSERT OR REPLACE INTO norm_t%s VALUES (?)" % dialog_id, normal_form_dump)
     end = ms()
     time.sleep(max(0, 1 - (end-start)))
@@ -110,7 +108,9 @@ def create_or_complete_database(token):
                                               ' [', progressbar.Timer(), '] ',
                                               progressbar.Bar(), dialog.name,
                                           ])
+            st = time.time()
             dump_message_pack(dialog.id, response["result"], cursor)
+            print(time.time() - st)
 
             bar.update(0)
 

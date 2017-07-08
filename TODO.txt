@@ -17,3 +17,5 @@ TODO: NMF
         2. Объединить в предложения
         3. Найти какой длины должны быть предложения
 
+        pip install numpy scipy matplotlib ipython jupyter pandas sympy nose
+

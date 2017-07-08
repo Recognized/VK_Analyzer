@@ -1,6 +1,7 @@
 from vkanalyzer.builders import *
 from vkanalyzer.drawers import *
 from vkanalyzer.vk import authorize
+from vkanalyzer.train import start_training
 
 
 def authorization():
@@ -26,7 +27,8 @@ def main():
     # build_word_frequencies_table()
     # build_stat_by_week()
     # build_stat_by_day()
-    day_accum_plot(2000000020)
+    # day_accum_plot(2000000020)
+    start_training()
 
 
 if __name__ == "__main__":

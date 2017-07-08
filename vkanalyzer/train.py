@@ -1,5 +1,4 @@
 import pymorphy2
-import time
 import sqlite3
 import re
 from gensim.models.word2vec import Word2Vec
@@ -7,7 +6,6 @@ import vkanalyzer.forks.progressbar_fork as progressbar
 
 
 class Conversation:
-    other_symbols = re.compile(r"[^a-zA-Zа-яА-Я ]", re.U)
 
     time_out = 35 * 60
 
@@ -19,13 +17,7 @@ class Conversation:
         self.text = ""
         for message in messages_rows:
             body = message[1]
-            body = Conversation.other_symbols.sub("", body)
-            for word in re.split("[\\W]+", body):
-                m = morph.parse(word)
-                if len(m) > 0:
-                    wrd = m[0]
-                    if wrd.tag.POS not in ('NUMR', 'NPRO', 'PREP', 'CONJ', 'PRCL', 'INTJ'):
-                        self.text += wrd.normal_form + " "
+            #TODO: smth was here
 
     def __len__(self):
         return self.size
@@ -68,7 +60,7 @@ def get_all_conversations():
                     conv = Conversation(temp)
                     if conv.text != "":
                         conversations.append(conv)
-                        temp = []
+                    temp = []
                     j += 1
         bar.finish()
         return conversations

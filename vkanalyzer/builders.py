@@ -3,16 +3,65 @@ import time
 import sqlite3
 from vkanalyzer.vk import api
 import vkanalyzer.forks.progressbar_fork as progressbar
+import pymorphy2
+import multiprocessing as mp
+import os
 
 del_trash = re.compile(r"[\'\"]+|\\$]", re.U)
+other_symbols = re.compile(r"[^a-zA-Zа-яА-Я ]", re.U)
+processors = os.cpu_count()
+
+
+def normalize_message(bodies):
+    morph = pymorphy2.MorphAnalyzer()
+    ans = []
+    for body in bodies:
+        text = ""
+        body = other_symbols.sub("", body)
+        for word in re.split("[\\W]+", body):
+            m = morph.parse(word)
+            if len(m) > 0:
+                wrd = m[0]
+                if wrd.tag.POS not in ('NUMR', 'NPRO', 'PREP', 'CONJ', 'PRCL', 'INTJ'):
+                    text += wrd.normal_form + " "
+        ans.append(text)
+    return ans
+
+
+def split(dump):
+    breakpoints = [0]
+    l = len(dump)
+    for i in range(processors-1):
+        breakpoints.append((i+1) * (l // processors))
+    breakpoints.append(l)
+    ans = []
+    temp = []
+    j = 0
+    for i in range(len(dump)):
+        temp.append(tuple(dump[i][1]))
+        if i == breakpoints[j]:
+            ans.append(temp)
+            temp = []
+            j += 1
+    ans.append(temp)
+    return ans
 
 
 def dump_message_pack(dialog_id, ans, cursor, regexp=del_trash):
+    ms = lambda: int(round(time.time() * 1000))
+    start = ms()
     dump = [(msg["id"], regexp.sub("", msg["body"]), msg["date"])
             for messages in ans for msg in reversed(messages["items"])
             if msg["body"] != ""]
     cursor.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?, ?)" % dialog_id, dump)
-    time.sleep(1)
+    if len(dump) < 300:
+        normal_form_dump = normalize_message([tuple(body[1]) for body in dump])
+    else:
+        with mp.Pool(processors) as p:
+            normal_form_dump = p.map(normalize_message, split(dump))
+    cursor.executemany("INSERT OR REPLACE INTO norm_t%s VALUES (?)" % dialog_id, normal_form_dump)
+    end = ms()
+    time.sleep(max(0, 1 - (end-start)))
 
 
 def create_or_complete_database(token):
@@ -35,8 +84,8 @@ def create_or_complete_database(token):
             cursor.execute(
                 "CREATE TABLE IF NOT EXISTS t%s (message_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, body TEXT, date INT)"
                 % dialog.id)
-            cursor.execute("INSERT OR REPLACE INTO dialogs VALUES (?, ?)",
-                           (dialog.id, dialog.name))
+            cursor.execute("CREATE TABLE IF NOT EXISTS norm_t%s (body TEXT)" % dialog.id)
+            cursor.execute("INSERT OR REPLACE INTO dialogs VALUES (?, ?)", (dialog.id, dialog.name))
             response = api.collect_messages(dialog, start_message_id, token)
             if response["result"][0]["items"][0]["id"] == start_message_id:
                 print(" " + dialog.name + "\'s dialog is already dumped\n")
@@ -44,17 +93,17 @@ def create_or_complete_database(token):
                 continue
 
             if "skipped" in response["result"][0]:
-                barIndex = response["result"][0]["skipped"]
+                bar_index = response["result"][0]["skipped"]
             else:
                 j = 0
                 for i in response["result"][0]["items"]:
                     if i["id"] > start_message_id:
                         j = j + 1
-                barIndex = j
+                bar_index = j
 
             start_message_id = response["new_start"]
 
-            bar = progressbar.ProgressBar(max_value=barIndex,
+            bar = progressbar.ProgressBar(max_value=bar_index,
                                           widgets=[
                                               progressbar.Percentage(), " ",
                                               progressbar.SimpleProgress(),
@@ -66,7 +115,7 @@ def create_or_complete_database(token):
             bar.update(0)
 
             while "skipped" in response["result"][0]:
-                bar.update(barIndex - response["result"][0]["skipped"])
+                bar.update(bar_index - response["result"][0]["skipped"])
                 response = api.collect_messages(dialog, start_message_id, token)
                 start_message_id = response["new_start"]
 
@@ -163,7 +212,7 @@ def build_stat_by_time(parseTime, tableName):
 
 def build_stat_by_daytime():
     regexp = re.compile("\\W+")
-    build_stat_by_time(lambda x : int(regexp.split(time.ctime(x))[3][:2]), "daytime")
+    build_stat_by_time(lambda x: int(regexp.split(time.ctime(x))[3][:2]), "daytime")
 
 
 def build_stat_by_week():

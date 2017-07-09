@@ -3,6 +3,7 @@ from urllib.parse import urlparse
 from html.parser import HTMLParser
 import http.cookiejar
 
+
 class FormParser(HTMLParser):
     def __init__(self):
         HTMLParser.__init__(self)
@@ -39,6 +40,7 @@ class FormParser(HTMLParser):
             self.in_form = False
             self.form_parsed = True
 
+
 def auth(email, password, client_id, scope):
     def split_key_value(kv_pair):
         kv = kv_pair.split("=")
@@ -50,14 +52,14 @@ def auth(email, password, client_id, scope):
             "http://oauth.vk.com/oauth/authorize?" + \
             "redirect_uri=http://oauth.vk.com/blank.html&response_type=token&" + \
             "client_id=%s&scope=%s&display=wap" % (client_id, ",".join(scope))
-            )
+        )
         doc = str(response.read())
         parser = FormParser()
         parser.feed(doc)
         parser.close()
         if not parser.form_parsed or parser.url is None or "pass" not in parser.params or \
-          "email" not in parser.params:
-              raise RuntimeError("Something wrong")
+                        "email" not in parser.params:
+            raise RuntimeError("Something wrong")
         parser.params["email"] = email
         parser.params["pass"] = password
         if parser.method == "POST":
@@ -72,13 +74,12 @@ def auth(email, password, client_id, scope):
         parser.feed(doc)
         parser.close()
         if not parser.form_parsed or parser.url is None:
-              raise RuntimeError("Something wrong")
+            raise RuntimeError("Something wrong")
         if parser.method == "POST":
             response = opener.open(parser.url, urllib.parse.urlencode(parser.params).encode("utf-8"))
         else:
             raise NotImplementedError("Method '%s'" % parser.method)
         return response.geturl()
-
 
     if not isinstance(scope, list):
         scope = [scope]
@@ -96,5 +97,3 @@ def auth(email, password, client_id, scope):
     if "access_token" not in answer or "user_id" not in answer:
         raise RuntimeError("Missing some values in answer")
     return answer["access_token"], answer["user_id"]
-
-

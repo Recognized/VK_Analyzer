@@ -1,31 +1,34 @@
-import pymorphy2
 import sqlite3
-import re
 import codecs
 from gensim.models.word2vec import Word2Vec, LineSentence
 import logging
-import vkanalyzer.forks.progressbar_fork as progressbar
 import multiprocessing as mp
-
-regexp = re.compile("[\\w]+")
+from vkanalyzer.cmeans import *
 
 count_of_sentences = 0
+time_out = 35 * 60
 
-class Conversation:
 
-    time_out = 35 * 60
+class Vocab:
+    def __init__(self, filename, min_count=3, invert_weights=lambda x: 1 / x):
+        self._data = dict()
+        self.all = 0
+        with codecs.open(filename, "r", encoding="utf-8") as source:
+            for line in source:
+                for word in line.split():
+                    self._data.setdefault(word, 0)
+                    self._data[word] += 1
+                    self.all += 1
+        for k, v in self._data.copy():
+            if v < min_count:
+                del self._data[k]
+            self._data[k] = invert_weights(v)
 
-    def __init__(self, messages_rows):
-        self.begin = messages_rows[0][2]
-        self.end = messages_rows[-1][2]  # sqlite: (message_id, body, date)
-        self.size = len(messages_rows)
-        self.text = ""
-        for message in messages_rows:
-            body = message[1]
-            # TODO: smth was here
+    def __getitem__(self, key: str):
+        return self._data[key]
 
-    def __len__(self):
-        return self.size
+    def __iter__(self):
+        return self._data.__iter__()
 
 
 def sentence(temp, file):
@@ -57,10 +60,10 @@ def get_all_conversations():
                 pass
             rows = cursor.fetchall()
             breakpoints = []
-            for i in range(len(rows)-1):
-                if rows[i + 1][2] - rows[i][2] > Conversation.time_out:
+            for i in range(len(rows) - 1):
+                if rows[i + 1][2] - rows[i][2] > time_out:
                     breakpoints.append(i)
-            breakpoints.append(len(rows)-1)
+            breakpoints.append(len(rows) - 1)
             temp = []
             j = 0
             for i in range(len(rows)):
@@ -72,19 +75,17 @@ def get_all_conversations():
 
 
 def start_training():
-    get_all_conversations()
-    print(count_of_sentences)
-    logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
-    logging.root.setLevel(level=logging.INFO)
-    model = Word2Vec(iter=1, min_count=3, window=5, size=200, workers=mp.cpu_count())
-    model.build_vocab(LineSentence("RAW_DATA.txt"))
-    with codecs.open("RAW_DATA.txt", "r", encoding="utf-8") as file:
-        model.train([line.split() for line in file], total_examples=count_of_sentences, epochs=10)
-        print(model.train_count)
-    model.save("model1.model")
-
-
-
-
-
-
+    # get_all_conversations()
+    # print(count_of_sentences)
+    # logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
+    # logging.root.setLevel(level=logging.INFO)
+    # model = Word2Vec(iter=1, min_count=7, window=7, size=200, workers=mp.cpu_count())
+    # model.build_vocab(LineSentence("RAW_DATA.txt"))
+    # with codecs.open("RAW_DATA.txt", "r", encoding="utf-8") as file:
+    #     model.train([line.split() for line in file], total_examples=count_of_sentences, epochs=15)
+    #     print(model.train_count)
+    # model.save("model1.model")
+    model = Word2Vec.load("model1.model")
+    my_vocab = Vocab("RAW_DATA.txt", model.min_count)
+    ar = np.ndarray(s)
+    for k, v in my_vocab:

@@ -1,3 +1,4 @@
+import typing
 from vkanalyzer.builders import *
 from vkanalyzer.drawers import *
 from vkanalyzer.vk import authorize

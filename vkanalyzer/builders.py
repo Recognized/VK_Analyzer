@@ -13,6 +13,8 @@ processors = os.cpu_count()
 
 
 def normalize_message(dump):
+    """This function transorms each word to its normal form.
+       For example: known -> know"""
     morph = pymorphy2.MorphAnalyzer()
     ans = []
     for k in dump:
@@ -29,7 +31,7 @@ def normalize_message(dump):
     return ans
 
 
-def dump_message_pack(dialog_id, ans, cursor, regexp=del_trash):
+def dump_message_pack(dialog_id : int, ans, cursor, regexp=del_trash):
     ms = lambda: int(round(time.time() * 1000))
     start = ms()
     dump = [(msg["id"], regexp.sub("", msg["body"]), msg["date"])
@@ -124,7 +126,7 @@ def build_word_frequencies_table():
             bar.update(i)
             dialog_id = row[0]
             dialog_freq = dict()
-            dialogs.execute("SELECT body FROM t%s" % dialog_id)
+            dialogs.execute("SELECT body FROM norm_t%s" % dialog_id)
             for message_row in dialogs.fetchall():
                 body = message_row[0]
                 for word in re.split('[., ]+', body):
@@ -144,8 +146,12 @@ def build_word_frequencies_table():
         bar.finish()
 
 
-def build_stat_by_time(parseTime, tableName):
-    with sqlite3.connect("dialogs.sqlite") as db, sqlite3.connect("%s.sqlite" % tableName) as table:
+def build_stat_by_time(parse_time, table_name):
+    """:param parse_time : it is a function that determines period of time (like every day or week) which
+                          this exact millisecond of system time belong to
+                          example: lambda x: x // (7 * 24 * 60 * 60), "week" """
+
+    with sqlite3.connect("dialogs.sqlite") as db, sqlite3.connect("%s.sqlite" % table_name) as table:
         dialogs = db.cursor()
         activity = table.cursor()
 
@@ -170,7 +176,7 @@ def build_stat_by_time(parseTime, tableName):
             dialogs.execute("SELECT date FROM t%s" % dialog_id)
             for message_row in dialogs.fetchall():
                 t = message_row[0]
-                when = parseTime(t)
+                when = parse_time(t)
                 stat_all.setdefault(when, 0)
                 stat_cur.setdefault(when, 0)
                 gtime_all.setdefault(when, t)

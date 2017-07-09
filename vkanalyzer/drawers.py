@@ -27,8 +27,8 @@ def save(name='', fmt='png'):
     os.chdir(pwd)
 
 
-def period_plot(dialog_id, tableName, freq, transform):
-    with sqlite3.connect("%s.sqlite" % tableName) as table:
+def period_plot(dialog_id, table_name, freq, transform):
+    with sqlite3.connect("%s.sqlite" % table_name) as table:
         week = table.cursor()
         week.execute("SELECT * FROM t%s ORDER BY time ASC" % dialog_id)
         res = week.fetchall()
@@ -46,7 +46,7 @@ def period_plot(dialog_id, tableName, freq, transform):
                                         freq=freq),
                        columns=[dialog_id])
         df.plot()
-        save("%s_%s_%s_%s" % (dialog_id, tableName, freq, time.time()))
+        save("%s_%s_%s_%s" % (dialog_id, table_name, freq, time.time()))
 
 
 def week_plot(dialog_id):

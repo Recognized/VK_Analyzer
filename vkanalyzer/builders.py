@@ -12,35 +12,20 @@ other_symbols = re.compile(r"[^a-zA-Zа-яА-Я ]", re.U)
 processors = os.cpu_count()
 
 
-def normalize_message(body):
-    text = ""
+def normalize_message(dump):
     morph = pymorphy2.MorphAnalyzer()
-    body = other_symbols.sub("", body)
-    for word in re.split("[\\W]+", body):
-        m = morph.parse(word)
-        if len(m) > 0:
-            wrd = m[0]
-            if wrd.tag.POS not in ('NUMR', 'NPRO', 'PREP', 'CONJ', 'PRCL', 'INTJ'):
-                    text += wrd.normal_form + " "
-    return text
-
-
-def split(dump):
-    breakpoints = [0]
-    l = len(dump)
-    for i in range(processors-1):
-        breakpoints.append((i+1) * (l // processors))
-    breakpoints.append(l)
     ans = []
-    temp = []
-    j = 0
-    for i in range(len(dump)):
-        temp.append(tuple(dump[i][1]))
-        if i == breakpoints[j]:
-            ans.append(temp)
-            temp = []
-            j += 1
-    ans.append(temp)
+    for k in dump:
+        body = k[1]
+        text = ""
+        body = other_symbols.sub("", body)
+        for word in re.split("[\\W]+", body):
+            m = morph.parse(word)
+            if len(m) > 0:
+                wrd = m[0]
+                if wrd.tag.POS not in ('NUMR', 'NPRO', 'PREP', 'CONJ', 'PRCL', 'INTJ'):
+                    text += wrd.normal_form + " "
+        ans.append((k[0], text.strip(), k[2]))
     return ans
 
 
@@ -51,13 +36,7 @@ def dump_message_pack(dialog_id, ans, cursor, regexp=del_trash):
             for messages in ans for msg in reversed(messages["items"])
             if msg["body"] != ""]
     cursor.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?, ?)" % dialog_id, dump)
-    if len(dump) < 300:
-        normal_form_dump = [tuple(normalize_message(body[1])) for body in dump]
-    else:
-        with mp.Pool(processors) as p:
-            temp = p.map(normalize_message, [body[1] for body in dump])
-            normal_form_dump = [tuple(i) for i in temp]
-    cursor.executemany("INSERT OR REPLACE INTO norm_t%s VALUES (?)" % dialog_id, normal_form_dump)
+    cursor.executemany("INSERT OR REPLACE INTO norm_t%s VALUES (?, ?, ?)" % dialog_id, normalize_message(dump))
     end = ms()
     time.sleep(max(0, 1 - (end-start)))
 
@@ -82,13 +61,15 @@ def create_or_complete_database(token):
             cursor.execute(
                 "CREATE TABLE IF NOT EXISTS t%s (message_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, body TEXT, date INT)"
                 % dialog.id)
-            cursor.execute("CREATE TABLE IF NOT EXISTS norm_t%s (body TEXT)" % dialog.id)
-            cursor.execute("INSERT OR REPLACE INTO dialogs VALUES (?, ?)", (dialog.id, dialog.name))
+            cursor.execute(
+                "CREATE TABLE IF NOT EXISTS norm_t%s (message_id INTEGER PRIMARY KEY ON CONFLICT REPLACE, body TEXT, date INT)"
+                % dialog.id)
             response = api.collect_messages(dialog, start_message_id, token)
             if response["result"][0]["items"][0]["id"] == start_message_id:
                 print(" " + dialog.name + "\'s dialog is already dumped\n")
                 time.sleep(1)
                 continue
+            cursor.execute("INSERT OR REPLACE INTO dialogs VALUES (?, ?)", (dialog.id, dialog.name))
 
             if "skipped" in response["result"][0]:
                 bar_index = response["result"][0]["skipped"]
@@ -108,9 +89,7 @@ def create_or_complete_database(token):
                                               ' [', progressbar.Timer(), '] ',
                                               progressbar.Bar(), dialog.name,
                                           ])
-            st = time.time()
             dump_message_pack(dialog.id, response["result"], cursor)
-            print(time.time() - st)
 
             bar.update(0)
 

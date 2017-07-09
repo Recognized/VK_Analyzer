@@ -10,11 +10,7 @@ def merge_list(a, b):
 # this function tooks major time
 def read_response(url):
     info = urllib.request.urlopen(url).read()
-    try:
-        return json.loads(info)["response"]
-    except:
-        print(info)
-        raise Exception("Wrong response received")
+    return json.loads(info)["response"]
 
 
 def call_api(method, **kwargs):

@@ -76,10 +76,9 @@ class CMeans:
     """
 
     metric = 'euclidean'
-    initialization = staticmethod(initialize_random)
 
     def __init__(self, n_clusters=2, n_init=10, max_iter=300, tol=1e-4,
-                 verbosity=0, random_state=None, eps=1e-18, **kwargs):
+                 verbosity=0, random_state=None, eps=1e-18, initialization_func = initialize_random, **kwargs):
         self.n_clusters = n_clusters
         self.n_init = n_init
         self.max_iter = max_iter
@@ -90,6 +89,7 @@ class CMeans:
         self.params = kwargs
         self.centers = None
         self.memberships = None
+        self.initialization = initialization_func
 
     def distances(self, x):
         """Calculates the distance between data x and the centers.
@@ -263,12 +263,14 @@ class Probabilistic(Fuzzy):
     """
 
     def calculate_memberships(self, x):
+        self.centers = self.initialization(x, self.n_clusters, self.random_state)
+        print(self.centers.shape)
         distances = self.distances(x)
         distances[distances == 0.] = 1e-18
-        return np.sum(np.power(
+        self.memberships = np.sum(np.power(
             np.divide(distances[:, :, np.newaxis], distances[:, np.newaxis, :]),
             2 / (self.m - 1)), axis=2) ** -1
 
     def calculate_centers(self, x):
-        return np.dot(self.fuzzifier(self.memberships).T, x) / \
+        self.centers = np.dot(self.fuzzifier(self.memberships).T, x) / \
                np.sum(self.fuzzifier(self.memberships).T, axis=1)[..., np.newaxis]

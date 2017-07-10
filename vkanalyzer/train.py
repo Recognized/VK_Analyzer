@@ -4,31 +4,39 @@ from gensim.models.word2vec import Word2Vec, LineSentence
 import logging
 import multiprocessing as mp
 from vkanalyzer.cmeans import *
+import pprint
 
 count_of_sentences = 0
 time_out = 35 * 60
 
 
 class Vocab:
-    def __init__(self, filename, min_count=3, invert_weights=lambda x: 1 / x):
+    def __init__(self, filename, model, invert_weights=lambda x: 1 / x):
         self._data = dict()
         self.all = 0
+        temp = []
         with codecs.open(filename, "r", encoding="utf-8") as source:
             for line in source:
                 for word in line.split():
                     self._data.setdefault(word, 0)
                     self._data[word] += 1
                     self.all += 1
-        for k, v in self._data.copy():
-            if v < min_count:
-                del self._data[k]
+        to_del = []
+        for k, v in self._data.items():
+            if v < model.min_count:
+                to_del.append(k)
+                continue
             self._data[k] = invert_weights(v)
+            temp.append(model.wv[k])
+        for k in to_del:
+            del self._data[k]
+        self.vectors = np.array(temp)
 
     def __getitem__(self, key: str):
         return self._data[key]
 
-    def __iter__(self):
-        return self._data.__iter__()
+    def items(self):
+        return self._data.items()
 
 
 def sentence(temp, file):
@@ -74,18 +82,38 @@ def get_all_conversations():
                     j += 1
 
 
+def initialize_centers_ones_diagonal(data, k=None, random_state=None, eps=None):
+    """Initialization only for number of clusters equal to n_features"""
+    ans = []
+    for i in range(data.shape[1]):
+        temp = []
+        for j in range(data.shape[1]):
+            if i == j:
+                temp.append(1)
+            else:
+                temp.append(1e-18)
+        ans.append(temp)
+    return np.array(ans)
+
+
 def start_training():
-    # get_all_conversations()
-    # print(count_of_sentences)
-    # logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
-    # logging.root.setLevel(level=logging.INFO)
-    # model = Word2Vec(iter=1, min_count=7, window=7, size=200, workers=mp.cpu_count())
-    # model.build_vocab(LineSentence("RAW_DATA.txt"))
-    # with codecs.open("RAW_DATA.txt", "r", encoding="utf-8") as file:
-    #     model.train([line.split() for line in file], total_examples=count_of_sentences, epochs=15)
-    #     print(model.train_count)
-    # model.save("model1.model")
-    model = Word2Vec.load("model1.model")
-    my_vocab = Vocab("RAW_DATA.txt", model.min_count)
-    ar = np.ndarray(s)
-    for k, v in my_vocab:
+    get_all_conversations()
+    print(count_of_sentences)
+    logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
+    logging.root.setLevel(level=logging.INFO)
+    model = Word2Vec(iter=1, min_count=7, window=7, size=50, workers=mp.cpu_count())
+    model.build_vocab(LineSentence("RAW_DATA.txt"))
+    with codecs.open("RAW_DATA.txt", "r", encoding="utf-8") as file:
+        model.train([line.split() for line in file], total_examples=count_of_sentences, epochs=15)
+        print(model.train_count)
+    model.clear_sims()
+    model.save("model1.model")
+    # model = Word2Vec.load("model1.model")
+    my_vocab = Vocab("RAW_DATA.txt", model)
+    clusters = Probabilistic(n_clusters=50, random_state=19993101, initialization_func=initialize_centers_ones_diagonal)
+    print(my_vocab.vectors.shape)
+    clusters.calculate_memberships(my_vocab.vectors)
+    clusters.calculate_centers(my_vocab.vectors)
+    pprint.pprint(clusters.centers)
+    for vector in clusters.centers:
+        print(model.similar_by_vector(vector))

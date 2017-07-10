@@ -8,7 +8,7 @@ import multiprocessing as mp
 import os
 
 del_trash = re.compile(r"[\'\"]+|\\$]", re.U)
-other_symbols = re.compile(r"[^a-zA-Zа-яА-Я ]", re.U)
+other_symbols = re.compile(r"[^а-яА-Я ]", re.U)
 processors = os.cpu_count()
 
 

@@ -2,7 +2,7 @@ import codecs
 import json
 import urllib.request, urllib.parse
 import pymorphy2
-
+import pickle
 import time
 
 
@@ -52,6 +52,9 @@ class Theme:
 
 def initialize_themes(filename):
     themes = []
+    s = Theme(["лингвостилистический"])
+    with open("test.pckl", "wb") as file:
+        pickle.dump(s.keywords, file)
     with codecs.open(filename, "r", encoding="utf-8") as file:
         for line in file:
             themes.append(Theme(line.split()))

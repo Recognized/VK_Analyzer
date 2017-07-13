@@ -1,8 +1,7 @@
-import typing
 from vkanalyzer.builders import *
 from vkanalyzer.drawers import *
 from vkanalyzer.vk import authorize
-from vkanalyzer.train import start_training
+import vkanalyzer.themes
 
 
 def authorization():
@@ -28,8 +27,11 @@ def main():
     # build_word_frequencies_table()
     # build_stat_by_week()
     # build_stat_by_day()
-    # day_accum_plot(2000000020)
-    start_training()
+    # day_plot(10278660)
+    # day_accum_plot(10278660)
+    # start_training()
+    vkanalyzer.themes.initialize_themes("themelist.txt")
+
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 import sqlite3
 import codecs
 from gensim.models.word2vec import Word2Vec, LineSentence
+from sklearn.cluster import KMeans, MeanShift
+import numpy as np
 import logging
 import multiprocessing as mp
-from vkanalyzer.cmeans import *
-import pprint
 
 count_of_sentences = 0
 time_out = 35 * 60
@@ -82,6 +82,10 @@ def get_all_conversations():
                     j += 1
 
 
+def checkEqualIvo(lst):
+    return not lst or lst.count(lst[0]) == len(lst)
+
+
 def initialize_centers_ones_diagonal(data, k=None, random_state=None, eps=None):
     """Initialization only for number of clusters equal to n_features"""
     ans = []
@@ -89,31 +93,44 @@ def initialize_centers_ones_diagonal(data, k=None, random_state=None, eps=None):
         temp = []
         for j in range(data.shape[1]):
             if i == j:
-                temp.append(1)
+                temp.append(20)
             else:
                 temp.append(1e-18)
         ans.append(temp)
-    return np.array(ans)
+    return None, np.array(ans)
 
 
 def start_training():
-    get_all_conversations()
-    print(count_of_sentences)
-    logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
-    logging.root.setLevel(level=logging.INFO)
-    model = Word2Vec(iter=1, min_count=7, window=7, size=50, workers=mp.cpu_count())
-    model.build_vocab(LineSentence("RAW_DATA.txt"))
-    with codecs.open("RAW_DATA.txt", "r", encoding="utf-8") as file:
-        model.train([line.split() for line in file], total_examples=count_of_sentences, epochs=15)
-        print(model.train_count)
-    model.clear_sims()
-    model.save("model1.model")
-    # model = Word2Vec.load("model1.model")
+    # get_all_conversations()
+    # print(count_of_sentences)
+    # logging.basicConfig(format='%(asctime)s: %(levelname)s: %(message)s')
+    # logging.root.setLevel(level=logging.INFO)
+    # model = Word2Vec(iter=1, min_count=7, window=7, size=300, workers=mp.cpu_count())
+    # model.build_vocab(LineSentence("RAW_DATA.txt"))
+    # with codecs.open("RAW_DATA.txt", "r", encoding="utf-8") as file:
+    #     model.train([line.split() for line in file], total_examples=count_of_sentences, epochs=15)
+    #     print(model.train_count)
+    # model.clear_sims()
+    # model.save("model1.model")
+    model = Word2Vec.load("model1.model")
     my_vocab = Vocab("RAW_DATA.txt", model)
-    clusters = Probabilistic(n_clusters=50, random_state=19993101, initialization_func=initialize_centers_ones_diagonal)
-    print(my_vocab.vectors.shape)
-    clusters.calculate_memberships(my_vocab.vectors)
-    clusters.calculate_centers(my_vocab.vectors)
-    pprint.pprint(clusters.centers)
-    for vector in clusters.centers:
+    kmean = KMeans(n_clusters=40, random_state=19993101).fit(my_vocab.vectors)
+    print(kmean.cluster_centers_)
+    for vector in kmean.cluster_centers_:
         print(model.similar_by_vector(vector))
+    print("---------------------------------------")
+    del kmean
+    meanshift = MeanShift().fit(my_vocab.vectors)
+    print(meanshift.cluster_centers_)
+    for vector in meanshift.cluster_centers_:
+        print(model.similar_by_vector(vector))
+    # lengths = [np.linalg.norm(x) for x in my_vocab.vectors]
+    # print(lengths)
+    # print(max(lengths))
+    # print(min(lengths))
+    # print(model.similar_by_vector(my_vocab.vectors[lengths.index(max(lengths))]))
+    # print(model.similar_by_vector(my_vocab.vectors[lengths.index(min(lengths))]))
+    # print(my_vocab.vectors.shape)
+    # print(model["нд"])
+    # print(model["квсполучить"])
+

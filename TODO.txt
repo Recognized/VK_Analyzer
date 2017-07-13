@@ -19,3 +19,6 @@ TODO: NMF
 
         pip install numpy scipy matplotlib ipython jupyter pandas sympy nose
 
+        1. Выделить блок стандартных тем для разговора
+        2.
+

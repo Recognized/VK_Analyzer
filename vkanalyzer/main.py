@@ -22,15 +22,15 @@ def authorization():
 
 
 def main():
-    # token, user_id = authorization()
-    # create_or_complete_database(token)
+    token, user_id = authorization()
+    create_or_complete_database(token)
     # build_word_frequencies_table()
     # build_stat_by_week()
     # build_stat_by_day()
     # day_plot(10278660)
     # day_accum_plot(10278660)
     # start_training()
-    vkanalyzer.themes.initialize_themes("themelist.txt")
+    # vkanalyzer.themes.initialize_themes("themelist.txt")
 
 
 

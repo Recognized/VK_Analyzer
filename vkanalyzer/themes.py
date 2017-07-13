@@ -1,9 +1,11 @@
 import codecs
 import json
+import os
 import urllib.request, urllib.parse
 import pymorphy2
 import pickle
 import time
+import re
 
 
 class Theme:
@@ -43,20 +45,24 @@ class Theme:
         self.keywords = {Theme.normalize_word(k): 1.0 for k in start_keywords}
         for k_1, v_1 in self.keywords.copy().items():
             self._find_related(k_1, depth=1, value=1)
-        while Theme.missed_words != dict():
-            print("Not all words were collected: ")
-            print(Theme.missed_words)
-            for k, v in Theme.missed_words.copy().items():
-                self._find_related(k, v[0], v[1])
+        # while Theme.missed_words != dict():
+        #     print("Not all words were collected: ")
+        #     print(Theme.missed_words)
+        #     for k, v in Theme.missed_words.copy().items():
+        #         self._find_related(k, v[0], v[1])
 
 
 def initialize_themes(filename):
-    themes = []
-    s = Theme(["лингвостилистический"])
-    with open("test.pckl", "wb") as file:
-        pickle.dump(s.keywords, file)
     with codecs.open(filename, "r", encoding="utf-8") as file:
         for line in file:
-            themes.append(Theme(line.split()))
-    with codecs.open("themes.json", "w", encoding="utf-8") as file:
-        file.write(json.dumps(themes))
+            t = Theme(line.split())
+            with codecs.open("themes/"+t.name+".pckl", "wb") as dump:
+                pickle.dump(t.keywords, dump)
+
+
+def get_themes():
+    files = os.listdir("./themes")
+    return {re.search("([а-яА-Я]+)", file).group(1): pickle.load(codecs.open("themes/" + file, "rb")) for file in files}
+
+if __name__ == '__main__':
+    initialize_themes("themelist.txt")

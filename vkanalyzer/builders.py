@@ -1,11 +1,15 @@
+import operator
 import re
 import time
 import sqlite3
 from vkanalyzer.vk import api
+from vkanalyzer.themes import get_themes
 import vkanalyzer.forks.progressbar_fork as progressbar
 import pymorphy2
 import multiprocessing as mp
 import os
+from itertools import *
+from pprint import pprint
 
 del_trash = re.compile(r"[\'\"]+|\\$]", re.U)
 other_symbols = re.compile(r"[^а-яА-Я ]", re.U)
@@ -206,3 +210,28 @@ def build_stat_by_week():
 
 def build_stat_by_day():
     build_stat_by_time(lambda x: x // (24 * 60 * 60), "day")
+
+# -------------------------------------------------
+# New functionality
+
+
+def build_themes(dialog_id):
+    themes = get_themes()
+    score = dict()
+    with sqlite3.connect("dialogs.sqlite") as db:
+        dialogs = db.cursor()
+        dialogs.execute("SELECT body FROM norm_t%s" % dialog_id)
+        for row in dialogs.fetchall():
+            body = row[0]
+            for word in body.split():
+                for name, theme in themes.items():
+                    if word in theme:
+                        score.setdefault(name, 0)
+                        score[name] += theme[word]
+    ac = sum([v for k, v in score.items()])
+    out = {k: v/ac*100 for k, v in score.items()}
+    pprint((sorted(out.items(), key=operator.itemgetter(1), reverse=True)))
+
+
+if __name__ == '__main__':
+    build_themes(10278660)

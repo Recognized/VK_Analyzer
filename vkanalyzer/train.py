@@ -1,7 +1,6 @@
 import sqlite3
 import codecs
 from gensim.models.word2vec import Word2Vec, LineSentence
-from sklearn.cluster import KMeans, MeanShift
 import numpy as np
 import logging
 import multiprocessing as mp
@@ -114,16 +113,6 @@ def start_training():
     # model.save("model1.model")
     model = Word2Vec.load("model1.model")
     my_vocab = Vocab("RAW_DATA.txt", model)
-    kmean = KMeans(n_clusters=40, random_state=19993101).fit(my_vocab.vectors)
-    print(kmean.cluster_centers_)
-    for vector in kmean.cluster_centers_:
-        print(model.similar_by_vector(vector))
-    print("---------------------------------------")
-    del kmean
-    meanshift = MeanShift().fit(my_vocab.vectors)
-    print(meanshift.cluster_centers_)
-    for vector in meanshift.cluster_centers_:
-        print(model.similar_by_vector(vector))
     # lengths = [np.linalg.norm(x) for x in my_vocab.vectors]
     # print(lengths)
     # print(max(lengths))

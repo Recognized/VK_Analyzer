@@ -215,23 +215,71 @@ def build_stat_by_day():
 # New functionality
 
 
-def build_themes(dialog_id):
-    themes = get_themes()
+def build_themes(dialog_id, themes):
     score = dict()
     with sqlite3.connect("dialogs.sqlite") as db:
         dialogs = db.cursor()
         dialogs.execute("SELECT body FROM norm_t%s" % dialog_id)
-        for row in dialogs.fetchall():
+        copied = dialogs.fetchall()
+        dialogs.execute("CREATE TABLE IF NOT EXISTS lengths (dialog_id INTEGER PRIMARY KEY, length INT)")
+        dialogs.execute("INSERT OR REPLACE INTO lengths VALUES (?, ?)", (dialog_id, len(copied)))
+        for row in copied:
             body = row[0]
             for word in body.split():
                 for name, theme in themes.items():
                     if word in theme:
                         score.setdefault(name, 0)
-                        score[name] += theme[word]
+                        score[name] += theme[word] ** 3
     ac = sum([v for k, v in score.items()])
     out = {k: v/ac*100 for k, v in score.items()}
-    pprint((sorted(out.items(), key=operator.itemgetter(1), reverse=True)))
+    with sqlite3.connect("themes.sqlite") as db:
+        cursor = db.cursor()
+        cursor.execute("CREATE TABLE IF NOT EXISTS t%s (theme TEXT, score DOUBLE)" % dialog_id)
+        cursor.executemany("INSERT OR REPLACE INTO t%s VALUES (?, ?)" % dialog_id, out.items())
+
+
+def build_themes_relatively():
+    threshold = 2000 # messages
+    themes = get_themes()
+    with sqlite3.connect("dialogs.sqlite") as db:
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM dialogs")
+        dialogs = [row[0] for row in cursor.fetchall()]
+    for dialog in dialogs:
+        build_themes(dialog, themes)
+    with sqlite3.connect("dialogs.sqlite") as db:
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM lengths")
+        lengths = cursor.fetchall()
+    lengths = list(filter(lambda x: x[1] > threshold, lengths))
+    with sqlite3.connect("themes.sqlite") as table:
+        cursor = table.cursor()
+        score_min, score_max = {}, {}
+        for id, length in lengths:
+            cursor.execute("SELECT * FROM t%s" % id)
+            for row in cursor.fetchall():
+                print(row[0], " ", row[1])
+                score_min.setdefault(row[0], row[1])
+                score_max.setdefault(row[0], row[1])
+                score_min[row[0]] = min(score_min[row[0]], row[1])
+                score_max[row[0]] = max(score_max[row[0]], row[1])
+        for id, length in lengths:
+            print(id)
+            cursor.execute("SELECT * FROM t%s" % id)
+            result = {}
+            for row in cursor.fetchall():
+                diff = (score_max[row[0]] - score_min[row[0]])/2
+                mid = score_min[row[0]] + diff
+                result[row[0]] = (row[1] - mid)/diff*100
+            cursor.execute("CREATE TABLE IF NOT EXISTS rel_t%s (name TEXT, score DOUBLE)" % id)
+            cursor.executemany("INSERT OR REPLACE INTO rel_t%s VALUES(?, ?)" % id, result.items())
 
 
 if __name__ == '__main__':
-    build_themes(10278660)
+    # build_themes_relatively()
+    dialog_id = 180207650
+    with sqlite3.connect("themes.sqlite") as table:
+        cursor = table.cursor()
+        cursor.execute("SELECT * FROM rel_t%s" % dialog_id)
+        ans = cursor.fetchall()
+        pprint(sorted(ans, key=operator.itemgetter(1), reverse=True))

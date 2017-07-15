@@ -1,6 +1,7 @@
 import vkanalyzer.vk.authorize
 from vkanalyzer.builders import *
 from vkanalyzer.drawers import *
+from pprint import pprint
 
 
 def main():

@@ -273,13 +273,4 @@ def build_themes_relatively():
                 result[row[0]] = (row[1] - mid)/diff*100
             cursor.execute("CREATE TABLE IF NOT EXISTS rel_t%s (name TEXT, score DOUBLE)" % id)
             cursor.executemany("INSERT OR REPLACE INTO rel_t%s VALUES(?, ?)" % id, result.items())
-
-
-if __name__ == '__main__':
-    build_themes_relatively()
-    dialog_id = 180207650
-    with sqlite3.connect("themes.sqlite") as table:
-        cursor = table.cursor()
-        cursor.execute("SELECT * FROM rel_t%s" % dialog_id)
-        ans = cursor.fetchall()
-        pprint(sorted(ans, key=operator.itemgetter(1), reverse=True))
+    

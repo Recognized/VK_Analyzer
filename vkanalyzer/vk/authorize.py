@@ -110,7 +110,7 @@ def authorization():
         with open("token", "w") as file:
             email = str(input("Email: "))
             password = str(input("Password: "))
-            token, user_id = authorize.auth(email, password, client_id, scope)
+            token, user_id = auth(email, password, client_id, scope)
             file.write(token + "\n" + user_id)
     print("Authorization succeeded\n")
     return token, user_id

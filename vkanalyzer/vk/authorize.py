@@ -2,6 +2,7 @@ import urllib.request, urllib.parse, urllib.error
 from urllib.parse import urlparse
 from html.parser import HTMLParser
 import http.cookiejar
+import re
 
 
 class FormParser(HTMLParser):

@@ -19,7 +19,7 @@ def prefix_sum(v):
 
 def save(name='', fmt='png'):
     pwd = os.getcwd()
-    path = '/pictures/{}'.format(fmt)
+    path = pwd + '\\pictures'
     if not os.path.exists(path):
         os.mkdir(path)
     os.chdir(path)

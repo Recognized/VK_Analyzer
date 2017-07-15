@@ -97,3 +97,20 @@ def auth(email, password, client_id, scope):
     if "access_token" not in answer or "user_id" not in answer:
         raise RuntimeError("Missing some values in answer")
     return answer["access_token"], answer["user_id"]
+
+
+def authorization():
+    client_id = "6096377"
+    scope = "messages,offline"
+
+    try:
+        with open("token", "r") as file:
+            token, user_id = (word for line in file for word in re.findall(r'\w+', line))
+    except FileNotFoundError:
+        with open("token", "w") as file:
+            email = str(input("Email: "))
+            password = str(input("Password: "))
+            token, user_id = authorize.auth(email, password, client_id, scope)
+            file.write(token + "\n" + user_id)
+    print("Authorization succeeded\n")
+    return token, user_id

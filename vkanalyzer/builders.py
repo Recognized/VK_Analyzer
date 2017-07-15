@@ -276,7 +276,7 @@ def build_themes_relatively():
 
 
 if __name__ == '__main__':
-    # build_themes_relatively()
+    build_themes_relatively()
     dialog_id = 180207650
     with sqlite3.connect("themes.sqlite") as table:
         cursor = table.cursor()

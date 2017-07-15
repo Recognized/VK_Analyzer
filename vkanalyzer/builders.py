@@ -4,7 +4,7 @@ import time
 import sqlite3
 from vkanalyzer.vk import api
 from vkanalyzer.themes import get_themes
-import vkanalyzer.forks.progressbar_fork as progressbar
+import progressbar
 import pymorphy2
 import multiprocessing as mp
 import os
